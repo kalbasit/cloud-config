@@ -1,0 +1,47 @@
+#cloud-config
+
+hostname: apollo
+ssh_authorized_keys:
+  - ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQC12yGXgmDBIgnFAYdoAPpzZsqydP+Y6LFjJcO1+tD6fT/3aXGJbGlKwlGtTkv9xIjIRfEHQq5GEY5pTr0jjnQoxCAEyyVtaFN99+WPyuOlZFNlIBG9Bdj1Y7E2Z/g083GZoAkJ6J7k3PrEXLQbpztHJ2nTQ9HNvP0BVmO6ibiQ5JogiiSnABGum2xQrxetQgvRXqtq7W5h++oFGgRkzepJIzYvxZjVITTPXDuGLyPDwCe98mJJbP+Vfj+n/86r/u7gdbUN9Z6NewcPhv2+Z4OE8hYK9jefyw2SbfI4OQoLL9Uzgi1F7oxKswDXIJcGVIZL2aVAE4HcFqo9DwaFE23Eo138Vjn36xspk9+Z1io5LgtWZ+PqZljKRd+QtWu+IEe6t3DoyDsx4TQh4pUd1/Aq6li70lp53TWj3XUi/WvxaZK559L9wcLR+FNfD/bhykssxiiAWoQoJOr1poP2Gi9pZMtc7RGOLzSNQ4Ln1AmTvVDyjN0CgjwZ9xhgjZXgnVbjShlwHnegfiaeH37dKXkWhP6DCyUBgnc0jTb7mq6Mn++1W4y+kC3FsBlZINoc4QGUX8mhSeSkSh6i1YlDl7CEwlGfbrOJw9GoDUyhftjTgGnGTAsBBqzWWd/GADKIgPAwobt23f89p3gGnG4o4+b+DpUSkHIfO0eV8twZqsOHlQ== wmn.global
+coreos:
+  units:
+  - name: stop-update-engine.service
+    command: start
+    content: |
+      [Unit]
+      Description=stop update-engine
+
+      [Service]
+      Type=oneshot
+      ExecStart=/usr/bin/systemctl stop update-engine.service
+      ExecStartPost=/usr/bin/systemctl mask update-engine.service
+  - name: load-overlay-module.service
+    command: start
+    content: |
+      [Unit]
+      Description=Load overlay module before docker start
+      Before=docker.service
+
+      [Service]
+      ExecStart=/bin/bash -c "lsmod | grep overlay || modprobe overlay"
+  - name: increase-nf_conntrack-connections.service
+    command: start
+    content: |
+      [Unit]
+      Description=Increase the number of connections in nf_conntrack. default is 65536
+
+      [Service]
+      Type=oneshot
+      ExecStartPre=/usr/sbin/modprobe nf_conntrack
+      ExecStart=/bin/sh -c "sysctl -w net.netfilter.nf_conntrack_max=262144"
+write_files:
+  - path: /etc/profile.d/nse-function.sh
+    permissions: '0755'
+    content: |
+      function nse() {
+        docker exec -it $1 bash
+      }
+  - path: /etc/systemd/coredump.conf
+    content: |
+      [Coredump]
+      Storage=none
